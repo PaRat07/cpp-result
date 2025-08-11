@@ -6,33 +6,6 @@
 #include <type_traits>
 
 namespace my {
-namespace details {
-template<typename T, typename U>
-struct like;
-
-template<typename T, typename U>
-struct like<T&, U> : std::type_identity<std::remove_reference_t<U>&> {};
-
-template<typename T, typename U>
-struct like<const T&, U> : std::type_identity<const std::remove_reference_t<U>&> {};
-
-template<typename T, typename U>
-struct like<T&&, U> : std::type_identity<std::remove_reference_t<U>&&> {};
-
-template<typename T, typename U>
-struct like<const T&&, U> : std::type_identity<const std::remove_reference_t<U>&&> {};
-
-template<typename T, typename U>
-using like_t = typename like<T, U>::type;
-
-// tests for like
-static_assert(std::is_same_v<like_t<int&, float>, float&>);
-static_assert(std::is_same_v<like_t<int&&, float>, float&&>);
-static_assert(std::is_same_v<like_t<const int&, float&>, const float&>);
-static_assert(std::is_same_v<like_t<const int&, float&&>, const float&>);
-static_assert(std::is_same_v<like_t<int&, const float&>, const float&>);
-}
-
 template<typename... Ts>
 struct over : Ts... { using Ts::operator()...; };
 
@@ -46,22 +19,6 @@ struct Ok {
 
   T& operator*() {
     return val;
-  }
-
-  operator Ok<const T&>() const& {
-    return { val };
-  }
-
-  operator Ok<T&>() & {
-    return { val };
-  }
-
-  operator Ok<T&&>() &&{
-    return { std::move(val) };
-  }
-
-  operator Ok<const T&&>() const && {
-    return { std::move(val) };
   }
 
   T val;
@@ -83,22 +40,6 @@ struct Err {
     return val;
   }
 
-  operator Err<const T&>() const& {
-    return { val };
-  }
-
-  operator Err<T&>() & {
-    return { val };
-  }
-
-  operator Err<T&&>() && {
-    return { std::move(val) };
-  }
-
-  operator Err<const T&&>() const&& {
-    return { val };
-  }
-
   T val;
 };
 
@@ -109,9 +50,9 @@ template<typename OkT, typename ErrT>
 struct Result {
 public:
   template<typename T>
-  Result(Ok<T> val) : value_(std::in_place_type<ok_type>, *val) {}
+  Result(Ok<T> &&val) : value_(std::in_place_type<ok_type>, *val) {}
   template<typename T>
-  Result(Err<T> val) : value_(std::in_place_type<err_type>, *val) {}
+  Result(Err<T> &&val) : value_(std::in_place_type<err_type>, *val) {}
 
 
   template<typename RetT, typename VarT, typename FuncT>
@@ -166,11 +107,11 @@ auto OkIfCond(bool cond) -> my::Result<int, int> {
 
 int main() {
   std::cout << OkIfCond(true).visit<float>(my::over{
-    [] (my::Ok<int&&> ok) { return *ok; },
-    [] (my::Err<int> ok) { return 0ULL; }
+    [] (my::Ok<int> ok) { return *ok; },
+    [] (my::Err<int> err) { return 0ULL; }
   });
   std::cout << OkIfCond(false).visit<int>(my::over{
-    [] (my::Ok<int&&> ok) { return 1.; },
-    [] (my::Err<int> ok) { return 0ULL; }
+    [] (my::Ok<int> ok) { return 1.; },
+    [] (my::Err<int> err) { return 0ULL; }
   });
 }
